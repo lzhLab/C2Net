@@ -1,6 +1,6 @@
-# C2Net
+# C^2Net
 
-Code for paper:"Bridging unknown to known: connectivity-guided faithful liver vessel segmentation" by Ye et al.
+Codes for the manuscript: "Bridging unknown to known: connectivity-guided faithful liver vessel segmentation" by Ye et al.
 
 ## Dependencies
 
@@ -16,13 +16,12 @@ Run the main program:
 	python train_seg.py
 ```
 
-You can change parameters in `train_seg.py`. We pretrained  `models/gru.py` using the training part of the datasets and the `pth` file was stored in `models/pretrained`.
+Parameters are editable in `train_seg.py`, the connectivity is pretrained by using `models/gru.py`, and the `pth` file was stored in `models/pretrained`.
 
 ## Datasets
 
-We use 3DIRCADb, MSD, LiVS datasets.
-
-Images and GT_labels should be organized as follows:
+The datasets used for model training and evalutation are 3DIRCADb, MSD, and LiVS.
+The input images and groundtruth labels should be organized as follows:
 
 ```
 ├── datasets
@@ -53,5 +52,5 @@ Images and GT_labels should be organized as follows:
 If the model is useful for your research, please cite:
 
 ```
-
+Yanxin Ye, Xu Xiao, Jin Zhang, Ruonan Wu, Ziqin Huang, Jie Luo, and Liang Zhao. Bridging unknown to known: connectivity-guided faithful liver vessel segmentation, 2023.
 ```
