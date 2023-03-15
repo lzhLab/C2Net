@@ -1,4 +1,4 @@
-# C^2Net
+# C<sup>2</sup>Net
 
 Codes for the manuscript: "Bridging unknown to known: connectivity-guided faithful liver vessel segmentation" by Ye et al.
 
