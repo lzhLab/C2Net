@@ -56,7 +56,6 @@ Yanxin Ye, Xu Xiao, Jin Zhang, Ruonan Wu, Ziqin Huang, Jie Luo, and Liang Zhao. 
 ```
 
 ## Reference
-[1] Soler L, H.A.，Agnus V,C.A.,Fasquel J，M.J.，Osswald A，B.M.，J, M.: 3D image reconstruction for comparison of algorithm database: A patient specific anatomical and medical image database. Strasbourg,France (2010) \par
-[2] Simpson，A.L.，Antonelli,M.，Bakas,S.,Bilello，M.，Farahani，K., Van Ginneken, B.，Kopp-Schneider，A.,，Landman，B.A.，Litjens， G.,Menze, B., et al.: A large annotated medical image dataset for the development and evaluation of segmentation algorithms. arXiv:1902.09063(2019) \par
-[3] Gao, Z.,Zong, Q.,Wang,Y.， Yan，Y.,Wang，Y., Zhu， N., Zhang,J.,
-Wang,Y., Zhao,L.: Laplacian salience-gated feature pyramid network for accurate liver vessel segmentation. IEEE Transactions on Medical Imaging (2023)
+[1] Soler L, H.A.，Agnus V,C.A.,Fasquel J，M.J.，Osswald A，B.M.，J, M.: 3D image reconstruction for comparison of algorithm database: A patient specific anatomical and medical image database. Strasbourg,France (2010)  
+[2] Simpson，A.L.，Antonelli,M.，Bakas,S.,Bilello，M.，Farahani，K., Van Ginneken, B.，Kopp-Schneider，A.,，Landman，B.A.，Litjens， G.,Menze, B., et al.: A large annotated medical image dataset for the development and evaluation of segmentation algorithms. arXiv:1902.09063(2019)  
+[3] Gao, Z.,Zong, Q.,Wang,Y.， Yan，Y.,Wang，Y., Zhu， N., Zhang,J., Wang,Y., Zhao,L.: Laplacian salience-gated feature pyramid network for accurate liver vessel segmentation. IEEE Transactions on Medical Imaging (2023)
