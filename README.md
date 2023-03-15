@@ -1,6 +1,6 @@
 # C2Net
 
-Code for paper:"Bridging unknown to known: connectivity-guided faithful liver vessel segmentation" by Yanxin Ye, ...............
+Code for paper:"Bridging unknown to known: connectivity-guided faithful liver vessel segmentation" by Yanxin Ye et al.
 
 ## Dependencies
 
