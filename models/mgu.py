@@ -3,9 +3,9 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 
-class GRU(nn.Module):
+class MGU(nn.Module):
     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim, bias=True):
-        super(GRU, self).__init__()
+        super(MGU, self).__init__()
         self.hidden_dim = hidden_dim
         self.layer_dim = layer_dim
         self.gru = nn.GRU(input_dim, hidden_dim, layer_dim, batch_first=True)
@@ -22,7 +22,7 @@ class GRU(nn.Module):
 
 
 if __name__ == '__main__':
-    rnn = GRU(input_dim=27, hidden_dim=32, layer_dim=2, output_dim=1).cuda()
+    rnn = MGU(input_dim=27, hidden_dim=32, layer_dim=2, output_dim=1).cuda()
     x = torch.randn(8, 50, 27).cuda()
     y = rnn(x)
     print(y.shape)
