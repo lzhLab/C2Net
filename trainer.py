@@ -120,53 +120,53 @@ class Trainer(object):
 
             # train
             self.model.train()
-            # for liver_imgs, tumor_mask in self.trainloader:
-            #     step += 1
-            #     liver_imgs = liver_imgs.to(self.device)
-            #     tumor_mask = tumor_mask.to(self.device)
-            #     batch = liver_imgs.size(0)
+            for liver_imgs, tumor_mask in self.trainloader:
+                step += 1
+                liver_imgs = liver_imgs.to(self.device)
+                tumor_mask = tumor_mask.to(self.device)
+                batch = liver_imgs.size(0)
 
-            #     self.optimizer.zero_grad()
+                self.optimizer.zero_grad()
 
-            #     # 用RNN生成连通性注意力图
-            #     if self.rnn != None:
-            #         att_map_h = attention(liver_imgs, self.rnn, 'H')
-            #         att_map_w = attention(liver_imgs, self.rnn, 'W')
-            #         merge = torch.cat([att_map_h, att_map_w], dim=1)
-            #         att_map, _ = torch.max(merge, dim=1, keepdim=True)
-            #     # print(att_map.shape)
+                # 用RNN生成连通性注意力图
+                if self.rnn != None:
+                    att_map_h = attention(liver_imgs, self.rnn, 'H')
+                    att_map_w = attention(liver_imgs, self.rnn, 'W')
+                    merge = torch.cat([att_map_h, att_map_w], dim=1)
+                    att_map, _ = torch.max(merge, dim=1, keepdim=True)
+                # print(att_map.shape)
 
-            #     # forward -- accumulate gradient
-            #     predicts, targets, metric_imgs, metric_targets= self.model(liver_imgs.float(), tumor_mask, att_map)
-            #     loss = self.criterion(predicts, targets) / self.accumulate_step
-            #     loss.backward()
-            #     self.optimizer.step()
+                # forward -- accumulate gradient
+                predicts, targets, metric_imgs, metric_targets= self.model(liver_imgs.float(), tumor_mask, att_map)
+                loss = self.criterion(predicts, targets) / self.accumulate_step
+                loss.backward()
+                self.optimizer.step()
                 
-            #     # metric
-            #     dice = self.dice_metric(metric_imgs, metric_targets)
-            #     train_dice += dice.item()
-            #     train_loss += loss.item()
-            #     train_loss_curve.append(loss.item() / small_batch_size)
+                # metric
+                dice = self.dice_metric(metric_imgs, metric_targets)
+                train_dice += dice.item()
+                train_loss += loss.item()
+                train_loss_curve.append(loss.item() / small_batch_size)
 
-            #     self.logging.info("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
-            #         self.fold, step, batch_num, loss.item(), dice.item() / batch))
-            #     print("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
-            #         self.fold, step, batch_num, loss.item(), dice.item() / batch))
+                self.logging.info("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
+                    self.fold, step, batch_num, loss.item(), dice.item() / batch))
+                print("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
+                    self.fold, step, batch_num, loss.item(), dice.item() / batch))
 
-            #     #tensorboard
-            #     iter_num += 1
-            #     writer.add_scalar('lr', self.optimizer.param_groups[0]['lr'], iter_num)
-            #     writer.add_scalars('loss', {'loss': train_loss}, iter_num)
-            #     writer.add_scalars('dice', {'dice': dice}, iter_num)
-            #     # save_imgs = torch.stack([liver_imgs[0, 1, :, :], att_map_h[0, 0, :, :]]).unsqueeze(1)
-            #     # writer.add_image('image', save_imgs, iter_num, dataformats='NCHW')
+                #tensorboard
+                iter_num += 1
+                writer.add_scalar('lr', self.optimizer.param_groups[0]['lr'], iter_num)
+                writer.add_scalars('loss', {'loss': train_loss}, iter_num)
+                writer.add_scalars('dice', {'dice': dice}, iter_num)
+                # save_imgs = torch.stack([liver_imgs[0, 1, :, :], att_map_h[0, 0, :, :]]).unsqueeze(1)
+                # writer.add_image('image', save_imgs, iter_num, dataformats='NCHW')
 
-            # aver_train_dice = train_dice / dt_size
-            # aver_train_loss = train_loss / batch_num
-            # train_dice_curve.append(aver_train_dice)
+            aver_train_dice = train_dice / dt_size
+            aver_train_loss = train_loss / batch_num
+            train_dice_curve.append(aver_train_dice)
 
-            # self.logging.info("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
-            # print("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
+            self.logging.info("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
+            print("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
 
             # Validate
             aver_val_loss, aver_val_dice = self.val_epoch()
