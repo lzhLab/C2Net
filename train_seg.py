@@ -134,8 +134,8 @@ def main(args):
 
         model = getModel(args, device)
         if args.pretrained:
-            snapshot = '/home/student/c2net/models/pretrained/loss_best_model.pth'
-            rnn = GRU(input_dim=27, hidden_dim=32, layer_dim=2, output_dim=1).to(device)
+            snapshot = '/home/c2net/models/pretrained/loss_best_model.pth'
+            rnn = MGU(input_dim=27, hidden_dim=32, layer_dim=2, output_dim=1).to(device)
             rnn.load_state_dict(torch.load(snapshot))
         else:
             rnn = None
