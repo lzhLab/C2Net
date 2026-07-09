@@ -1,72 +1,139 @@
+import os
+import time
+import inspect
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import os
-import cv2
-import numpy as np
-import logging
-from datetime import datetime
-from alive_progress import alive_it
-from torchvision import transforms as transforms
-from tensorboardX import SummaryWriter
-from utils.plot import *
 
 
-def attention(img_tensor, model=None, direction='W'):
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+
+class AverageMeter:
+    """Computes and stores the average and current value."""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0.0
+        self.avg = 0.0
+        self.sum = 0.0
+        self.count = 0
+
+    def update(self, val, n=1):
+        val = float(val)
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / max(self.count, 1)
+
+
+def binary_dice_score(logits, targets, threshold=0.5, eps=1e-7):
     """
-    args:
-        img_tensor: a tensor with shape (B, 3, H, W);
-        model: a pretrained RNN model;
-    returns:
-        guide_map: a tensor with shape (B, 1, H, W);
+    Compute binary Dice score from logits.
+
+    logits:  [B, 1, H, W] or [B, H, W]
+    targets: [B, 1, H, W] or [B, H, W]
     """
-    assert img_tensor.dim() == 4 and img_tensor.shape[1] == 3 # (B, 3, H, W)
-    B, _, H, W = img_tensor.size()
-    # print(img_tensor.shape)
+    if logits.dim() == 3:
+        logits = logits.unsqueeze(1)
 
-    MIN, MAX = img_tensor.min(), img_tensor.max()
-    if MAX != MIN:
-        img_tensor = (img_tensor - MIN) / (MAX - MIN)
+    if targets.dim() == 3:
+        targets = targets.unsqueeze(1)
 
-    pad_h, pad_w = 3 - H % 3, 3 - W % 3
-    img_vol = F.pad(img_tensor, (0, pad_w, 0, pad_h), mode='constant', value=0)
-    assert img_vol.shape[2] % 3 == 0 and img_vol.shape[3] % 3 == 0
+    targets = targets.float()
 
-    inputs_lst = []
-    if direction == 'H':
-        for b in range(B):
-            for h in range(0, H, 3):
-                img_chunk = img_vol[b, :, h: h + 3, :].transpose(0, 2)
-                inputs_lst.append(img_chunk.reshape(-1, 27))
-    elif direction == 'W':
-        for b in range(B):
-            for w in range(0, W, 3):
-                img_chunk = img_vol[b, :, :, w: w + 3].transpose(0, 1)
-                inputs_lst.append(img_chunk.reshape(-1, 27))
+    probs = torch.sigmoid(logits)
+    preds = (probs > threshold).float()
 
-    inputs = torch.stack(inputs_lst)
-    model.eval()
+    dims = tuple(range(1, preds.dim()))
+    intersection = torch.sum(preds * targets, dim=dims)
+    union = torch.sum(preds, dim=dims) + torch.sum(targets, dim=dims)
+
+    dice = (2.0 * intersection + eps) / (union + eps)
+    return dice.mean()
+
+
+def binary_iou_score(logits, targets, threshold=0.5, eps=1e-7):
+    """
+    Compute binary IoU/Jaccard score from logits.
+    """
+    if logits.dim() == 3:
+        logits = logits.unsqueeze(1)
+
+    if targets.dim() == 3:
+        targets = targets.unsqueeze(1)
+
+    targets = targets.float()
+
+    probs = torch.sigmoid(logits)
+    preds = (probs > threshold).float()
+
+    dims = tuple(range(1, preds.dim()))
+    intersection = torch.sum(preds * targets, dim=dims)
+    union = torch.sum(preds + targets, dim=dims) - intersection
+
+    iou = (intersection + eps) / (union + eps)
+    return iou.mean()
+
+
+def save_binary_prediction(logits, save_path):
+    """
+    Save the first prediction in a batch as a grayscale PNG.
+
+    This function is optional and only used when PIL is available.
+    """
+    if Image is None:
+        return
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
     with torch.no_grad():
-        preds = torch.sigmoid(model(inputs)).squeeze()
+        if logits.dim() == 4:
+            logits = logits[0, 0]
+        elif logits.dim() == 3:
+            logits = logits[0]
 
-    step = preds.shape[0] // B
-    lst = [preds[i: i + step] for i in range(0, preds.shape[0], step)]
-    preds = torch.stack(lst)
+        prob = torch.sigmoid(logits)
+        pred = (prob > 0.5).float()
+        pred = pred.detach().cpu().numpy()
+        pred = (pred * 255).astype(np.uint8)
 
-    if direction == 'W':
-        preds = preds.transpose(1, 2)
-
-    preds = F.interpolate(preds.unsqueeze(1), size=[H, W], mode='nearest')
-    # print(preds.shape)
-    return preds
+        Image.fromarray(pred).save(save_path)
 
 
-class Trainer(object):
-    def __init__(self, args, model, criterion, optimizer, trainloader, valloader, device, scheduler=None, fold=None, rnn=None):
-        super(Trainer, self).__init__()
+class Trainer:
+    """
+    Trainer for image segmentation.
+
+    Compatible with:
+    1. New C2Net/RNN_Model:
+        output = model(image)
+
+    2. Old model interface:
+        predicts, targets, metric_imgs, metric_targets = model(image, mask, att_map)
+    """
+
+    def __init__(
+        self,
+        args,
+        model,
+        criterion,
+        optimizer,
+        trainloader,
+        valloader,
+        device,
+        scheduler=None,
+        fold=0,
+        rnn=None
+    ):
         self.args = args
         self.model = model
-        self.rnn = rnn
         self.criterion = criterion
         self.optimizer = optimizer
         self.trainloader = trainloader
@@ -74,201 +141,337 @@ class Trainer(object):
         self.device = device
         self.scheduler = scheduler
         self.fold = fold
-        self.accumulate_step = args.accumulate_step
-        self.logging = Trainer.getLog(self.args)
-        self.logging.info("====================\nArgs:{}\n====================".format(self.args))
+        self.rnn = rnn
 
-    def getLog(args):
-        dirname = os.path.join(args.logs_dir, args.arch, 'epochs_'+str(args.epochs),
-        'batch_size_'+str(args.batch_size))
-        filename = os.path.join(dirname, 'log.log')
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-        
-        logging.basicConfig(
-                filename=filename,
-                level=logging.INFO,
-                format='%(asctime)s:%(message)s'
-            )
-        return logging
-    
+        self.epochs = getattr(args, "epochs", 100)
+        self.accumulate_step = max(1, int(getattr(args, "accumulate_step", 1)))
+
+        self.weights_dir = getattr(args, "weights_dir", "results/weights")
+        self.predicts_dir = getattr(args, "predicts_dir", "results/predicts")
+        self.logs_dir = getattr(args, "logs_dir", "results/logs")
+
+        os.makedirs(self.weights_dir, exist_ok=True)
+        os.makedirs(self.predicts_dir, exist_ok=True)
+        os.makedirs(self.logs_dir, exist_ok=True)
+
+        self.best_val_dice = -1.0
+        self.best_epoch = -1
+
+    def make_attention_map(self, liver_imgs):
+        """
+        Build attention map for the old RNN-assisted model.
+
+        For the new C2Net/RNN_Model, self.rnn should be None,
+        so this function simply returns None.
+        """
+        if self.rnn is None:
+            return None
+
+        try:
+            attention_func = globals().get("attention", None)
+
+            if attention_func is None:
+                raise RuntimeError(
+                    "self.rnn is not None, but attention() function is not available "
+                    "in trainer.py. Please import or define attention()."
+                )
+
+            att_map_h = attention_func(liver_imgs, self.rnn, "H")
+            att_map_w = attention_func(liver_imgs, self.rnn, "W")
+
+            merge = torch.cat([att_map_h, att_map_w], dim=1)
+            att_map, _ = torch.max(merge, dim=1, keepdim=True)
+
+            return att_map
+
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to build attention map for the old RNN-assisted model."
+            ) from exc
+
+    def forward_model(self, liver_imgs, tumor_mask):
+        """
+        Compatible forward wrapper.
+
+        New model:
+            outputs = model(liver_imgs)
+
+        Old model:
+            predicts, targets, metric_imgs, metric_targets =
+                model(liver_imgs, tumor_mask, att_map)
+        """
+        liver_imgs = liver_imgs.float()
+        tumor_mask = tumor_mask.float()
+
+        att_map = self.make_attention_map(liver_imgs)
+
+        if att_map is not None:
+            try:
+                outputs = self.model(liver_imgs, tumor_mask, att_map)
+            except TypeError:
+                outputs = self.model(liver_imgs)
+        else:
+            try:
+                outputs = self.model(liver_imgs)
+            except TypeError:
+                outputs = self.model(liver_imgs, tumor_mask, None)
+
+        if isinstance(outputs, (tuple, list)):
+            if len(outputs) == 4:
+                predicts, targets, metric_imgs, metric_targets = outputs
+            elif len(outputs) == 2:
+                predicts, targets = outputs
+                metric_imgs = predicts
+                metric_targets = targets
+            else:
+                predicts = outputs[0]
+                targets = tumor_mask
+                metric_imgs = predicts
+                metric_targets = tumor_mask
+        else:
+            predicts = outputs
+            targets = tumor_mask
+            metric_imgs = outputs
+            metric_targets = tumor_mask
+
+        targets = targets.float()
+        metric_targets = metric_targets.float()
+
+        if predicts.dim() == 3:
+            predicts = predicts.unsqueeze(1)
+
+        if targets.dim() == 3:
+            targets = targets.unsqueeze(1)
+
+        if metric_imgs.dim() == 3:
+            metric_imgs = metric_imgs.unsqueeze(1)
+
+        if metric_targets.dim() == 3:
+            metric_targets = metric_targets.unsqueeze(1)
+
+        return predicts, targets, metric_imgs, metric_targets
+
     def train(self):
-        best_train_epoch, best_val_epoch = 0, 0
-        best_train_dice, best_val_dice = 0., 0.
-        train_loss_curve = list()
-        valid_loss_curve = list()
-        train_dice_curve = list()
-        valid_dice_curve = list()
+        print("=" * 80)
+        print(f"Start training fold {self.fold}")
+        print("=" * 80)
 
-        dirname = os.path.join(self.args.logs_dir, self.args.arch, 'epochs_'+str(self.args.epochs),
-        'batch_size_'+str(self.args.batch_size))
-        now = '{:%Y-%m-%d_%H-%M-%S}'.format(datetime.now())
-        writer = SummaryWriter(os.path.join(dirname,now))
-        iter_num = 0
+        for epoch in range(1, self.epochs + 1):
+            start_time = time.time()
 
-        for epoch in alive_it(range(1, self.args.epochs + 1)):
-            self.logging.info('-' * 20)
-            self.logging.info('Epoch {}/{} lr: {}'.format(epoch, self.args.epochs, self.optimizer.param_groups[0]['lr']))
-            self.logging.info('-' * 20)
-            dt_size = len(self.trainloader.dataset)
-            train_loss = 0
-            train_dice = 0
-            step = 0
-            N = self.trainloader.batch_size
-            small_batch_size = N // self.accumulate_step
-            batch_num = (dt_size - 1) // N + 1
+            train_loss, train_dice, train_iou = self.train_epoch(epoch)
+            val_loss, val_dice, val_iou = self.val_epoch(epoch)
 
-            # train
-            self.model.train()
-            for liver_imgs, tumor_mask in self.trainloader:
-                step += 1
-                liver_imgs = liver_imgs.to(self.device)
-                tumor_mask = tumor_mask.to(self.device)
-                batch = liver_imgs.size(0)
-
-                self.optimizer.zero_grad()
-
-                # rnn
-                if self.rnn != None:
-                    att_map_h = attention(liver_imgs, self.rnn, 'H')
-                    att_map_w = attention(liver_imgs, self.rnn, 'W')
-                    merge = torch.cat([att_map_h, att_map_w], dim=1)
-                    att_map, _ = torch.max(merge, dim=1, keepdim=True)
-                # print(att_map.shape)
-
-                # forward -- accumulate gradient
-                predicts, targets, metric_imgs, metric_targets= self.model(liver_imgs.float(), tumor_mask, att_map)
-                loss = self.criterion(predicts, targets) / self.accumulate_step
-                loss.backward()
-                self.optimizer.step()
-                
-                # metric
-                dice = self.dice_metric(metric_imgs, metric_targets)
-                train_dice += dice.item()
-                train_loss += loss.item()
-                train_loss_curve.append(loss.item() / small_batch_size)
-
-                self.logging.info("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
-                    self.fold, step, batch_num, loss.item(), dice.item() / batch))
-                print("fold: %d, %d/%d, train_loss:%0.8f, train_dice:%0.8f" % (
-                    self.fold, step, batch_num, loss.item(), dice.item() / batch))
-
-                #tensorboard
-                iter_num += 1
-                writer.add_scalar('lr', self.optimizer.param_groups[0]['lr'], iter_num)
-                writer.add_scalars('loss', {'loss': train_loss}, iter_num)
-                writer.add_scalars('dice', {'dice': dice}, iter_num)
-
-            aver_train_dice = train_dice / dt_size
-            aver_train_loss = train_loss / batch_num
-            train_dice_curve.append(aver_train_dice)
-
-            self.logging.info("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
-            print("epoch %d aver_train_loss:%0.8f, aver_train_dice:%0.8f" % (epoch, aver_train_loss, aver_train_dice))
-
-            # Validate
-            aver_val_loss, aver_val_dice = self.val_epoch()
-            valid_loss_curve.append(aver_val_loss)
-            
-            # self.logging.info(type(aver_val_dice))
-            valid_dice_curve.append(aver_val_dice)
-            self.logging.info("epoch %d aver_valid_loss:%0.8f, aver_valid_dice:%0.8f" % (epoch, aver_val_loss, aver_val_dice))
-            print("epoch %d aver_valid_loss:%0.8f, aver_valid_dice:%0.8f" % (epoch, aver_val_loss, aver_val_dice))
-
-            # save model weight
-            weights_path = os.path.join(self.args.weights_dir, self.args.arch,
-                                        'batch_size_' + str(self.args.batch_size))
-            if not os.path.exists(weights_path):
-                os.makedirs(weights_path)
-
-            if (epoch + 1) % 2 == 0:
-                filename = 'fold_' + str(self.fold) + '_epochs_' + str(epoch + 1) + '.pth'
-                weight_path = os.path.join(weights_path, filename)
-                torch.save(self.model.state_dict(), weight_path)
-
-            if best_train_dice < aver_train_dice:
-                best_train_dice = aver_train_dice
-                best_train_epoch = epoch
-
-            if best_val_dice < aver_val_dice:
-                best_val_weight_path = os.path.join(weights_path, 'fold_' + str(self.fold) + '_best_val_dice.pth')
-                torch.save(self.model.state_dict(), best_val_weight_path)
-                best_val_dice = aver_val_dice
-                best_val_epoch = epoch
-
-            self.logging.info("epoch:%d best_train_dice:%0.8f, best_train_epoch:%d, best_valid_dice:%0.8f, best_val_epoch:%d"
-            % (epoch, best_train_dice, best_train_epoch, best_val_dice, best_val_epoch))
-
-            # scheduler
             if self.scheduler is not None:
-                self.scheduler.step(aver_val_dice)
+                self._step_scheduler(val_loss, val_dice)
 
-        train_x = range(len(train_loss_curve))
-        train_y = train_loss_curve
+            is_best = val_dice > self.best_val_dice
 
-        train_iters = len(self.trainloader)
-        valid_x = np.arange(1, len(valid_loss_curve) + 1) * train_iters
-        valid_y = valid_loss_curve
-        loss_plot(self.args, self.fold, train_x, train_y, valid_x, valid_y)
-        metrics_plot(self.args, self.fold, 'train&valid', train_dice_curve, valid_dice_curve)
+            if is_best:
+                self.best_val_dice = val_dice
+                self.best_epoch = epoch
+                self.save_checkpoint(epoch, is_best=True)
 
-        writer.close()
+            self.save_checkpoint(epoch, is_best=False)
 
-    def val_epoch(self):
-        save_root = self.args.predicts_dir
+            elapsed = time.time() - start_time
+
+            log_msg = (
+                f"Fold [{self.fold}] "
+                f"Epoch [{epoch:03d}/{self.epochs:03d}] "
+                f"Time {elapsed:.1f}s | "
+                f"Train Loss {train_loss:.4f} "
+                f"Train Dice {train_dice:.4f} "
+                f"Train IoU {train_iou:.4f} | "
+                f"Val Loss {val_loss:.4f} "
+                f"Val Dice {val_dice:.4f} "
+                f"Val IoU {val_iou:.4f} | "
+                f"Best Dice {self.best_val_dice:.4f} "
+                f"at Epoch {self.best_epoch}"
+            )
+
+            print(log_msg)
+            self.write_log(log_msg)
+
+        print("=" * 80)
+        print(
+            f"Finished fold {self.fold}. "
+            f"Best Val Dice: {self.best_val_dice:.4f} "
+            f"at Epoch {self.best_epoch}"
+        )
+        print("=" * 80)
+
+    def train_epoch(self, epoch):
+        self.model.train()
+
+        loss_meter = AverageMeter()
+        dice_meter = AverageMeter()
+        iou_meter = AverageMeter()
+
+        self.optimizer.zero_grad(set_to_none=True)
+
+        batch_num = len(self.trainloader)
+
+        for step, batch in enumerate(self.trainloader, start=1):
+            liver_imgs, tumor_mask = self.unpack_batch(batch)
+
+            liver_imgs = liver_imgs.to(self.device, non_blocking=True)
+            tumor_mask = tumor_mask.to(self.device, non_blocking=True)
+
+            predicts, targets, metric_imgs, metric_targets = self.forward_model(
+                liver_imgs,
+                tumor_mask
+            )
+
+            loss = self.criterion(predicts, targets)
+            loss_for_backward = loss / self.accumulate_step
+            loss_for_backward.backward()
+
+            if step % self.accumulate_step == 0 or step == batch_num:
+                self.optimizer.step()
+                self.optimizer.zero_grad(set_to_none=True)
+
+            with torch.no_grad():
+                dice = binary_dice_score(metric_imgs, metric_targets)
+                iou = binary_iou_score(metric_imgs, metric_targets)
+
+            batch_size = liver_imgs.size(0)
+            loss_meter.update(loss.item(), batch_size)
+            dice_meter.update(dice.item(), batch_size)
+            iou_meter.update(iou.item(), batch_size)
+
+            if step % 20 == 0 or step == batch_num:
+                print(
+                    f"Train Epoch [{epoch:03d}] "
+                    f"Step [{step:04d}/{batch_num:04d}] "
+                    f"Loss {loss_meter.avg:.4f} "
+                    f"Dice {dice_meter.avg:.4f} "
+                    f"IoU {iou_meter.avg:.4f}"
+                )
+
+        return loss_meter.avg, dice_meter.avg, iou_meter.avg
+
+    @torch.no_grad()
+    def val_epoch(self, epoch):
         self.model.eval()
-        with torch.no_grad():
-            loss_v, dice_v, ii = 0., 0., 0
-            dt_size = len(self.valloader.dataset)
-            batch_num = (dt_size - 1) // self.valloader.batch_size + 1
 
-            # validation
-            for liver_imgs, tumor_mask in self.valloader:
-                liver_imgs = liver_imgs.to(self.device)
-                tumor_mask = tumor_mask.to(self.device)
+        loss_meter = AverageMeter()
+        dice_meter = AverageMeter()
+        iou_meter = AverageMeter()
 
-                if self.rnn != None:
-                    att_map_h = attention(liver_imgs, self.rnn, 'H')
-                    att_map_w = attention(liver_imgs, self.rnn, 'W')
-                    merge = torch.cat([att_map_h, att_map_w], dim=1)
-                    att_map, _ = torch.max(merge, dim=1, keepdim=True)
+        save_root = os.path.join(self.predicts_dir, f"fold_{self.fold}", f"epoch_{epoch}")
+        os.makedirs(save_root, exist_ok=True)
 
-                predicts, targets, metric_imgs, metric_targets = self.model(liver_imgs, tumor_mask, att_map)
-                loss = self.criterion(predicts, targets)
+        batch_num = len(self.valloader)
 
-                loss_v += loss.item()
-                dice_v += self.dice_metric(metric_imgs, metric_targets).cpu()
-                metric_imgs = torch.sigmoid(metric_imgs)
-                metric_imgs = metric_imgs * torch.round(metric_imgs)
-                metric_targets = (metric_targets > 0).float()
+        for step, batch in enumerate(self.valloader, start=1):
+            liver_imgs, tumor_mask = self.unpack_batch(batch)
 
-                # save prediction
-                for num in range(liver_imgs.shape[0]):
-                    index = liver_imgs.shape[1] // 2
-                    x = torch.squeeze(liver_imgs[num, index, :, :]).cpu().numpy()
-                    output = torch.squeeze(metric_imgs[num, 0, :, :]).cpu().numpy()
-                    gt = torch.squeeze(metric_targets[num, 0, :, :]).cpu().numpy()
-                    # cv2.imshow('img', img_y)
-                    src_path = os.path.join(save_root, "predict_%d_origin.png" % ii)
-                    output_path = os.path.join(save_root, "predict_%d_predict.png" % ii)
-                    gt_path = os.path.join(save_root, "predict_%d_mask.png" % ii)
+            liver_imgs = liver_imgs.to(self.device, non_blocking=True)
+            tumor_mask = tumor_mask.to(self.device, non_blocking=True)
 
-                    cv2.imwrite(src_path, x * 255)
-                    cv2.imwrite(output_path, output * 255)
-                    cv2.imwrite(gt_path, gt * 255)
-                    ii += 1
+            predicts, targets, metric_imgs, metric_targets = self.forward_model(
+                liver_imgs,
+                tumor_mask
+            )
 
-        return loss_v / batch_num, dice_v / dt_size
+            loss = self.criterion(predicts, targets)
+            dice = binary_dice_score(metric_imgs, metric_targets)
+            iou = binary_iou_score(metric_imgs, metric_targets)
 
-    def dice_metric(self, predicts, targets):
-        smooth = 1e-5
-        predicts = (predicts > 0).float().cpu()
-        targets = (targets > 0).float().cpu()
+            batch_size = liver_imgs.size(0)
+            loss_meter.update(loss.item(), batch_size)
+            dice_meter.update(dice.item(), batch_size)
+            iou_meter.update(iou.item(), batch_size)
 
-        N = targets.size(0)
-        pred_flat = predicts.view(N, -1)
-        gt_flat = targets.view(N, -1)
-        intersection = (pred_flat * gt_flat).sum(1)
-        unionset = pred_flat.sum(1) + gt_flat.sum(1)
-        dice = (2 * intersection + smooth) / (unionset + smooth)
-        return dice.sum()
+            if step == 1:
+                save_path = os.path.join(save_root, "prediction_sample.png")
+                save_binary_prediction(metric_imgs, save_path)
+
+            if step % 20 == 0 or step == batch_num:
+                print(
+                    f"Val Epoch [{epoch:03d}] "
+                    f"Step [{step:04d}/{batch_num:04d}] "
+                    f"Loss {loss_meter.avg:.4f} "
+                    f"Dice {dice_meter.avg:.4f} "
+                    f"IoU {iou_meter.avg:.4f}"
+                )
+
+        return loss_meter.avg, dice_meter.avg, iou_meter.avg
+
+    def unpack_batch(self, batch):
+        """
+        Support common dataset returns:
+            image, mask
+            image, mask, extra_info...
+        """
+        if isinstance(batch, (tuple, list)):
+            if len(batch) < 2:
+                raise ValueError("Batch should contain at least image and mask.")
+            liver_imgs = batch[0]
+            tumor_mask = batch[1]
+        else:
+            raise ValueError(
+                "Unsupported batch format. Expected tuple/list: (image, mask, ...)."
+            )
+
+        return liver_imgs, tumor_mask
+
+    def _step_scheduler(self, val_loss, val_dice):
+        """
+        Step scheduler safely.
+
+        Recommended:
+        - If ReduceLROnPlateau(mode='max'), monitor val_dice.
+        - If ReduceLROnPlateau(mode='min'), monitor val_loss.
+        """
+        if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            mode = getattr(self.scheduler, "mode", "min")
+
+            if mode == "max":
+                self.scheduler.step(val_dice)
+            else:
+                self.scheduler.step(val_loss)
+        else:
+            self.scheduler.step()
+
+    def save_checkpoint(self, epoch, is_best=False):
+        model_state = self.model.module.state_dict() if isinstance(
+            self.model,
+            nn.DataParallel
+        ) else self.model.state_dict()
+
+        checkpoint = {
+            "epoch": epoch,
+            "fold": self.fold,
+            "model_state_dict": model_state,
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "best_val_dice": self.best_val_dice,
+            "best_epoch": self.best_epoch
+        }
+
+        if self.scheduler is not None:
+            checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
+
+        latest_path = os.path.join(
+            self.weights_dir,
+            f"fold_{self.fold}_latest.pth"
+        )
+
+        torch.save(checkpoint, latest_path)
+
+        if is_best:
+            best_path = os.path.join(
+                self.weights_dir,
+                f"fold_{self.fold}_best.pth"
+            )
+            torch.save(checkpoint, best_path)
+
+    def write_log(self, message):
+        log_path = os.path.join(
+            self.logs_dir,
+            f"fold_{self.fold}_train.log"
+        )
+
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
