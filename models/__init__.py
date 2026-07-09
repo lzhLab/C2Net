@@ -1,3 +1,2 @@
 from .unet import *
-from .gru import *
-from .rnn_model import *
+from .C2Net import CCRUNet, RNN_Model
