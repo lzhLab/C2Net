@@ -240,8 +240,10 @@ out_channels = output_size
 ```
 # PSPNet
 
-PSPNet usually contains a pyramid pooling module and a final classifier. The adaptations include:
+PSPNet usually contains a pyramid pooling module and a final classifier. 
 
+The adaptations include:
+```
 modify the input stem to accept in_channels;
 
 modify the final classifier to output out_channels;
@@ -249,11 +251,13 @@ modify the final classifier to output out_channels;
 upsample the output to the original image size;
 
 return final logits only.
+```
 
 # TransUNet
 
-TransUNet is configuration-dependent. The adaptations include:
-
+TransUNet is configuration-dependent. 
+The adaptations include:
+```
 setting the input image size;
 
 setting patch size and ViT configuration;
@@ -263,41 +267,48 @@ modifying the input channel setting if the implementation assumes RGB input;
 setting the number of output classes to out_channels;
 
 returning final logits only.
+```
 
 # SA-UNet
 
-SA-UNet can be treated as a U-Net variant with spatial attention. The adaptations include:
-
+SA-UNet can be treated as a U-Net variant with spatial attention. 
+The adaptations include:
+```
 changing the input channel number;
 
 changing the final output channel number;
 
 ensuring that the model returns logits only.
+```
 
 # R2U-Net
 
-R2U-Net uses recurrent residual blocks with recurrent depth t=2. Required adaptations include:
-
+R2U-Net uses recurrent residual blocks with recurrent depth t=2. 
+The adaptations include:
+```
 matching input and output channels;
 
 exposing t=2 as a fixed or configurable argument;
 
 returning one logits tensor.
+```
 
 # RU-Net
 
-RU-Net implementations may differ across repositories. The adaptations include:
-
+RU-Net implementations may differ across repositories. 
+The adaptations include:
+```
 standardize constructor arguments;
 
 remove repository-specific training logic;
 
 return final logits.
-
+```
 # LS-FPN
 
-The LS-FPN repository is dataset- and task-specific. To integrate it:
-
+The LS-FPN repository is dataset- and task-specific. 
+The adaption include:
+```
 extract the model definition from the original project;
 
 keep only the network forward pass;
@@ -305,11 +316,12 @@ keep only the network forward pass;
 adapt input and output channels;
 
 return the final segmentation logits.
-
+```
 ## nnU-Net
 
-nnU-Net is not a single ordinary baseline model but a full self-configuring framework. It performs its own:
-
+nnU-Net is not a single ordinary baseline model but a full self-configuring framework. 
+It performs its own:
+```
 dataset conversion;
 
 preprocessing;
@@ -321,7 +333,7 @@ training;
 inference;
 
 post-processing.
-
+```
 Therefore, we run nnU-Net using the official repository and compare its results externally.
 
 ## 3D U-Net
@@ -329,17 +341,18 @@ Therefore, we run nnU-Net using the official repository and compare its results 
 3D U-Net requires 3D inputs: [B, C, D, H, W]
 
 The adaptations include:
-
+```
 modify the dataset loader to return 3D volumes;
 
 modify transforms;
 
 adapt evaluation to 3D outputs.
-
+```
 ## SCUNet++
 
-SCUNet++ relys on Swin Transformer blocks and CNN bottlenecks. The adaptations include::
-
+SCUNet++ relys on Swin Transformer blocks and CNN bottlenecks. 
+The adaptations include::
+```
 installing model-specific dependencies;
 
 setting image size and feature dimensions;
@@ -347,11 +360,12 @@ setting image size and feature dimensions;
 adapting input and output channels;
 
 returning final logits only.
-
+```
 ## UMamba
 
-UMamba rely on Mamba-specific modules and custom configurations. The adaptations include:
-
+UMamba rely on Mamba-specific modules and custom configurations.
+The adaptations include:
+```
 installing the required Mamba-related dependencies;
 
 extracting the segmentation network from the original project;
@@ -361,7 +375,7 @@ adapting input and output channels;
 ensuring that the output has the same spatial size as the input;
 
 returning final logits only.
-
+```
 ## Citation
 If this code or model is useful for your research, please cite:
 
