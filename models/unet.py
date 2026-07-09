@@ -1,7 +1,6 @@
 from turtle import forward
 import torch
 from torch import nn
-# import nn.torch.functional as F
 
 
 class DoubleConv(nn.Module):
