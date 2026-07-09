@@ -119,21 +119,22 @@ python train_seg.py --arch Unet --lr 1e-3 --epochs 100
 ## 5. Supported and Optional Baseline Models
 The training script is designed to support multiple baseline segmentation models through a unified interface.
 
-| No. | Model | Reference | Code Link |
-|---:|---|---|---|
-| 1 | U-Net | Ronneberger et al., MICCAI 2015 | https://github.com/milesial/Pytorch-UNet |
-| 2 | PSPNet | Luo et al., Engineering Letters 2024 | https://github.com/hszhao/PSPNet |
-| 3 | TransUNet | Chen et al., arXiv 2021 | https://github.com/Beckschen/TransUNet |
-| 4 | SA-UNet | Guo et al., ICPR 2021 | https://github.com/clguo/SA-UNet |
-| 5 | R2U-Net | Alom et al., arXiv 2018 | https://github.com/navamikairanda/R2U-Net |
-| 6 | RU-Net | Wang et al., CMPB 2022 | https://github.com/siml3/RU-Net |
-| 7 | LS-FPN | Gao et al., IEEE TMI 2023 | https://github.com/lzhLab/LiVS |
-| 8 | nnU-Net | Isensee et al., Nature Methods 2020 | https://github.com/MIC-DKFZ/nnUNet |
-| 9 | 3D U-Net | Huang et al., Computers in Biology and Medicine 2018 | https://github.com/wolny/pytorch-3dunet |
-| 10 | SCUNet++ | Chen et al., WACV 2024 | https://github.com/justlfc03/scunet-plusplus |
-| 11 | UMamba | Jain et al., BSPC 2026 | https://github.com/DJ-CHB/DiffUMamba-Official |
+| No. | Model | Reference | Code Link | Adaptations |
+|---:|---|---|---|---|
+| 1 | U-Net | Ronneberger et al., MICCAI 2015 | https://github.com/milesial/Pytorch-UNet | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `block=DoubleConv` |
+| 2 | PSPNet | Luo et al., Engineering Letters 2024 | https://github.com/hszhao/PSPNet | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `pool_sizes=[1,2,3,6]`, `norm=GroupNorm` |
+| 3 | TransUNet | Chen et al., arXiv 2021 | https://github.com/Beckschen/TransUNet | `dim=2D`, `img_size=512`, `vit=R50-ViT-B_16`, `num_classes=output_size` |
+| 4 | SA-UNet | Guo et al., ICPR 2021 | https://github.com/clguo/SA-UNet | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `attention=spatial` |
+| 5 | R2U-Net | Alom et al., arXiv 2018 | https://github.com/navamikairanda/R2U-Net | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `t=2`, `block=recurrent-residual` |
+| 6 | RU-Net | Wang et al., CMPB 2022 | https://github.com/siml3/RU-Net | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `t=2`, `residual=False` |
+| 7 | LS-FPN | Gao et al., IEEE TMI 2023 | https://github.com/lzhLab/LiVS | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `stages=3`, `fusion=top-down FPN` |
+| 8 | nnU-Net | Isensee et al., Nature Methods 2020 | https://github.com/MIC-DKFZ/nnUNet | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `norm=InstanceNorm`, `act=LeakyReLU`, `pipeline=not official` |
+| 9 | 3D U-Net | Huang et al., Computers in Biology and Medicine 2018 | https://github.com/wolny/pytorch-3dunet | `dim=pseudo-3D`, `input=[B,C,H,W]->[B,C,1,H,W]`, `conv=3D`, `output=[B,out_ch,H,W]` |
+| 10 | SCUNet++ | Chen et al., WACV 2024 | https://github.com/justlfc03/scunet-plusplus | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `skip=nested`, `block=DoubleConv` |
+| 11 | UMamba | Jain et al., BSPC 2026 | https://github.com/DJ-CHB/DiffUMamba-Official | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `block=gated depthwise conv`, `norm=GroupNorm`, `act=SiLU` |
 
-To make a model callable from train_seg.py, each model should follow the same interface.
+
+To make a model callable from train_seg.py, each model follow the same interface.
 
 ## 5.1 Recommended Constructor
 ```
@@ -226,155 +227,7 @@ Run:
 python train_seg.py --arch PSPNet
 ```
 
-### 7. Model-Specific Notes
-# U-Net
 
-U-Net can usually be adapted with minimal changes. The first convolution accepts:
-```
-in_channels = expand_size * 2 + 1
-```
-
-and the final segmentation head outputs:
-```
-out_channels = output_size
-```
-# PSPNet
-
-PSPNet usually contains a pyramid pooling module and a final classifier. 
-
-The adaptations include:
-```
-modify the input stem to accept in_channels;
-
-modify the final classifier to output out_channels;
-
-upsample the output to the original image size;
-
-return final logits only.
-```
-
-# TransUNet
-
-TransUNet is configuration-dependent. 
-The adaptations include:
-```
-setting the input image size;
-
-setting patch size and ViT configuration;
-
-modifying the input channel setting if the implementation assumes RGB input;
-
-setting the number of output classes to out_channels;
-
-returning final logits only.
-```
-
-# SA-UNet
-
-SA-UNet can be treated as a U-Net variant with spatial attention. 
-The adaptations include:
-```
-changing the input channel number;
-
-changing the final output channel number;
-
-ensuring that the model returns logits only.
-```
-
-# R2U-Net
-
-R2U-Net uses recurrent residual blocks with recurrent depth t=2. 
-The adaptations include:
-```
-matching input and output channels;
-
-exposing t=2 as a fixed or configurable argument;
-
-returning one logits tensor.
-```
-
-# RU-Net
-
-RU-Net implementations may differ across repositories. 
-The adaptations include:
-```
-standardize constructor arguments;
-
-remove repository-specific training logic;
-
-return final logits.
-```
-# LS-FPN
-
-The LS-FPN repository is dataset- and task-specific. 
-The adaption include:
-```
-extract the model definition from the original project;
-
-keep only the network forward pass;
-
-adapt input and output channels;
-
-return the final segmentation logits.
-```
-## nnU-Net
-
-nnU-Net is not a single ordinary baseline model but a full self-configuring framework. 
-It performs its own:
-```
-dataset conversion;
-
-preprocessing;
-
-planning;
-
-training;
-
-inference;
-
-post-processing.
-```
-
-## 3D U-Net
-
-3D U-Net requires 3D inputs: [B, C, D, H, W]
-
-The adaptations include:
-```
-modify the dataset loader to return 3D volumes;
-
-modify transforms;
-
-adapt evaluation to 3D outputs.
-```
-## SCUNet++
-
-SCUNet++ relys on Swin Transformer blocks and CNN bottlenecks. 
-The adaptations include::
-```
-installing model-specific dependencies;
-
-setting image size and feature dimensions;
-
-adapting input and output channels;
-
-returning final logits only.
-```
-## UMamba
-
-UMamba rely on Mamba-specific modules and custom configurations.
-The adaptations include:
-```
-installing the required Mamba-related dependencies;
-
-extracting the segmentation network from the original project;
-
-adapting input and output channels;
-
-ensuring that the output has the same spatial size as the input;
-
-returning final logits only.
-```
 ## Citation
 If this code or model is useful for your research, please cite:
 
