@@ -27,9 +27,10 @@ pip install monai         # useful for nnU-Net-like and 3D medical segmentation 
 pip install scipy scikit-image   # required for ASSD, HD, and clDice evaluation
 Note: Only install the optional dependencies required by the models you plan to run.
 
-2. Project Structure
+## 2. Project Structure
 A typical project structure is:
 
+```bash
 C2Net/
 ├── train_seg.py
 ├── trainer.py
@@ -54,25 +55,18 @@ C2Net/
     ├── weights/
     ├── predicts/
     └── plots/
+
 The proposed model is implemented in:
-
+```
 models/C2Net.py
-The default callable model name in train_seg.py is:
-
-RNN_Model
+```
 In the current implementation, RNN_Model is used as a compatibility wrapper for the proposed C<sup>2</sup>Net architecture.
 
-3. Dataset Organization
-The datasets used for training and evaluation include:
-
-3DIRCADb
-
-MSD
-
-LiVS
+## 3. Dataset Organization
+The datasets used for training and evaluation include: 3DIRCADb, MSD, and LiVS
 
 The input images and ground-truth labels should be organized as follows:
-
+```
 datasets/
 └── data/
     ├── LiVS/
@@ -94,26 +88,32 @@ datasets/
     │   └── ...
     └── 3DIRCADb/
         └── ...
+```
 The image folder and label folder should have matched case IDs and slice names.
 
-4. Basic Usage
+### 4. Basic Usage
 To train the default model, run:
-
+```
 python train_seg.py
+```
 This is equivalent to:
-
+```
 python train_seg.py --arch RNN_Model
+```
 To explicitly train the proposed model:
-
+```
 python train_seg.py --arch RNN_Model --lr 1e-3 --epochs 100 --batch-size 8
+```
 To print the model architecture and hyperparameters:
-
+```
 python train_seg.py --arch RNN_Model --print-model --epochs 1 --batch-size 2
+```
 To train U-Net:
-
+```
 python train_seg.py --arch Unet --lr 1e-3 --epochs 100
+```
 
-5. Proposed Model: C<sup>2</sup>Net
+#### 5. Proposed Model: C<sup>2</sup>Net
 The proposed model is implemented in:
 
 models/C2Net.py
