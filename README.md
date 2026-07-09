@@ -228,143 +228,139 @@ python train_seg.py --arch PSPNet
 
 ### 7. Model-Specific Notes
 # U-Net
-U-Net is the simplest 2D baseline. It should work directly if models/unet.py defines:
+
+U-Net can usually be adapted with minimal changes. The first convolution accepts:
 ```
-class Unet(nn.Module):
-    ...
+in_channels = expand_size * 2 + 1
 ```
-Run:
+
+and the final segmentation head outputs:
 ```
-python train_seg.py --arch Unet
+out_channels = output_size
 ```
 # PSPNet
-PSPNet is originally designed for natural-image semantic segmentation. To use it here:
-Set in_channels to expand_size * 2 + 1
-Set the final classifier output to output_size
 
-Ensure output resolution is upsampled to the input resolution
+PSPNet usually contains a pyramid pooling module and a final classifier. The adaptations include:
 
-Return only the final logits
+modify the input stem to accept in_channels;
 
-Run:
-```
-python train_seg.py --arch PSPNet
-```
+modify the final classifier to output out_channels;
+
+upsample the output to the original image size;
+
+return final logits only.
+
 # TransUNet
-TransUNet usually requires:
 
-Image size configuration
+TransUNet is configuration-dependent. The adaptations include:
 
-ViT patch size configuration
+setting the input image size;
 
-Pretrained ViT weights, if used
+setting patch size and ViT configuration;
 
-Final output channel modification
+modifying the input channel setting if the implementation assumes RGB input;
 
-For this project, wrap it so that:
-```
-TransUNet(in_channels, out_channels, base_channels)
-returns logits with shape:
-[B, out_channels, H, W]
-```
+setting the number of output classes to out_channels;
 
-Run:
-```
-python train_seg.py --arch TransUNet --batch-size 4 --lr 1e-4
-```
+returning final logits only.
+
 # SA-UNet
-SA-UNet can be treated as a 2D U-Net variant. Required changes:
 
-Return logits only
+SA-UNet can be treated as a U-Net variant with spatial attention. The adaptations include:
 
-Run:
-```
-python train_seg.py --arch SAUNet
-```
-R2U-Net
-R2U-Net commonly uses recurrent residual blocks with t=2.
+changing the input channel number;
 
-Set recurrent depth if needed
-Return logits only
-Run:
-```
-python train_seg.py --arch R2UNet
-```
+changing the final output channel number;
+
+ensuring that the model returns logits only.
+
+# R2U-Net
+
+R2U-Net uses recurrent residual blocks with recurrent depth t=2. Required adaptations include:
+
+matching input and output channels;
+
+exposing t=2 as a fixed or configurable argument;
+
+returning one logits tensor.
 
 # RU-Net
-RU-Net implementations vary across repositories. Required changes:
 
-Wrap the model constructor
-Return logits only
+RU-Net implementations may differ across repositories. The adaptations include:
 
-Run:
-```
-python train_seg.py --arch RU_Net
-```
+standardize constructor arguments;
+
+remove repository-specific training logic;
+
+return final logits.
+
 # LS-FPN
-LS-FPN is a liver vessel-specific segmentation baseline. Required changes:
 
-Add the model implementation under 
-```
-models/ls_fpn/
-```
-Wrap the constructor
+The LS-FPN repository is dataset- and task-specific. To integrate it:
 
-Return final segmentation logits only
+extract the model definition from the original project;
 
-Run:
-```
-python train_seg.py --arch LSFPN
-```
-# nnU-Net
-nnU-Net is a self-configuring framework and is best used through its official pipeline.
+keep only the network forward pass;
 
-Required usage:
+adapt input and output channels;
 
-Convert dataset to the nnU-Net format.
+return the final segmentation logits.
 
-Run nnU-Net preprocessing and planning.
+## nnU-Net
 
-Train and evaluate using the official nnU-Net commands.
+nnU-Net is not a single ordinary baseline model but a full self-configuring framework. It performs its own:
 
-Run:
-```
-python train_seg.py --arch nnUNet
-```
-# 3D U-Net
-3D U-Net requires 5D input tensors:
-[B, C, D, H, W]
-The current train_seg.py and dataset pipeline are primarily designed for 2D slice-based training.
-To run 3D U-Net, you must modify the dataset loader so that it returns volumetric or stacked-slice inputs.
-Run only after adapting the dataset:
-```
-python train_seg.py --arch UNet3D
-```
-# SCUNet++
-SCUNet++ required changes:
+dataset conversion;
 
-Wrap the constructor
-Return logits only
+preprocessing;
 
-Run:
-```
-python train_seg.py --arch SCUNetPP
-```
-# UMamba
-UMamba implementations depend on Mamba-specific packages.
+planning;
 
-Required changes:
+training;
 
-Install model-specific dependencies
+inference;
 
-Wrap the constructor
+post-processing.
 
-Return logits only
+Therefore, we run nnU-Net using the official repository and compare its results externally.
 
-Run:
-```
-python train_seg.py --arch UMamba
-```
+## 3D U-Net
+
+3D U-Net requires 3D inputs: [B, C, D, H, W]
+
+The adaptations include:
+
+modify the dataset loader to return 3D volumes;
+
+modify transforms;
+
+adapt evaluation to 3D outputs.
+
+## SCUNet++
+
+SCUNet++ relys on Swin Transformer blocks and CNN bottlenecks. The adaptations include::
+
+installing model-specific dependencies;
+
+setting image size and feature dimensions;
+
+adapting input and output channels;
+
+returning final logits only.
+
+## UMamba
+
+UMamba rely on Mamba-specific modules and custom configurations. The adaptations include:
+
+installing the required Mamba-related dependencies;
+
+extracting the segmentation network from the original project;
+
+adapting input and output channels;
+
+ensuring that the output has the same spatial size as the input;
+
+returning final logits only.
 
 ## Citation
 If this code or model is useful for your research, please cite:
