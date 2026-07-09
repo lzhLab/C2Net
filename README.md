@@ -57,6 +57,7 @@ C2Net/
     ├── weights/
     ├── predicts/
     └── plots/
+```
 
 The proposed model is implemented in:
 ```
