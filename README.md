@@ -16,6 +16,8 @@ The original environment used for this project is:
 ```bash
 python 3.8
 pytorch 1.8
+```
+
 Recommended basic packages:
 
 pip install numpy scipy scikit-image pillow opencv-python matplotlib
