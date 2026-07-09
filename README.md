@@ -119,18 +119,19 @@ python train_seg.py --arch Unet --lr 1e-3 --epochs 100
 ## 5. Supported and Optional Baseline Models
 The training script is designed to support multiple baseline segmentation models through a unified interface.
 
-No.	Model	Reference	Code Link
-1	U-Net	Ronneberger et al., MICCAI 2015	https://github.com/milesial/Pytorch-UNet
-2	PSPNet	Luo et al., Engineering Letters 2024	https://github.com/hszhao/semseg
-3	TransUNet	Chen et al., arXiv 2021	https://github.com/Beckschen/TransUNet
-4	SA-UNet	Guo et al., ICPR 2021	https://github.com/clguo/SA-UNet
-5	R2U-Net	Alom et al., arXiv 2018	https://github.com/LeeJunHyun/Image_Segmentation
-6	RU-Net	Wang et al., CMPB 2022	Project-specific implementation
-7	LS-FPN	Gao et al., IEEE TMI 2023	Project-specific implementation
-8	nnU-Net	Isensee et al., Nature Methods 2020	https://github.com/MIC-DKFZ/nnUNet
-9	3D U-Net	Huang et al., Computers in Biology and Medicine 2018	https://github.com/wolny/pytorch-3dunet
-10	SCUNet++	Chen et al., WACV 2024	Project-specific implementation
-11	UMamba	Jain et al., BSPC 2026	Project-specific implementation
+| No. | Model | Reference | Code Link |
+|---:|---|---|---|
+| 1 | U-Net | Ronneberger et al., MICCAI 2015 | https://github.com/milesial/Pytorch-UNet |
+| 2 | PSPNet | Luo et al., Engineering Letters 2024 | https://github.com/hszhao/semseg |
+| 3 | TransUNet | Chen et al., arXiv 2021 | https://github.com/Beckschen/TransUNet |
+| 4 | SA-UNet | Guo et al., ICPR 2021 | https://github.com/clguo/SA-UNet |
+| 5 | R2U-Net | Alom et al., arXiv 2018 | https://github.com/LeeJunHyun/Image_Segmentation |
+| 6 | RU-Net | Wang et al., CMPB 2022 | Project-specific implementation |
+| 7 | LS-FPN | Gao et al., IEEE TMI 2023 | https://github.com/lzhLab/LiVS |
+| 8 | nnU-Net | Isensee et al., Nature Methods 2020 | https://github.com/MIC-DKFZ/nnUNet |
+| 9 | 3D U-Net | Huang et al., Computers in Biology and Medicine 2018 | https://github.com/wolny/pytorch-3dunet |
+| 10 | SCUNet++ | Chen et al., WACV 2024 | Project-specific implementation |
+| 11 | UMamba | Jain et al., BSPC 2026 | Project-specific implementation |
 
 To make a model callable from train_seg.py, each model should follow the same interface.
 
