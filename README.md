@@ -334,7 +334,6 @@ inference;
 
 post-processing.
 ```
-Therefore, we run nnU-Net using the official repository and compare its results externally.
 
 ## 3D U-Net
 
