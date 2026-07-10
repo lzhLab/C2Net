@@ -132,6 +132,7 @@ The training script is designed to support multiple baseline segmentation models
 | 9 | 3D U-Net | Huang et al., Computers in Biology and Medicine 2018 | https://github.com/wolny/pytorch-3dunet | `dim=pseudo-3D`, `input=[B,C,H,W]->[B,C,1,H,W]`, `conv=3D`, `output=[B,out_ch,H,W]` |
 | 10 | SCUNet++ | Chen et al., WACV 2024 | https://github.com/justlfc03/scunet-plusplus | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `skip=nested`, `block=DoubleConv` |
 | 11 | UMamba | Jain et al., BSPC 2026 | https://github.com/DJ-CHB/DiffUMamba-Official | `dim=2D`, `in_ch=input_channels`, `out_ch=output_size`, `block=gated depthwise conv`, `norm=GroupNorm`, `act=SiLU` |
+
 Note: Some external repositories provide complete training pipelines rather than standalone PyTorch modules. In this project, each baseline is adapted or wrapped to match the unified train_seg.py interface.
 
 ## 5.1 Recommended Constructor
