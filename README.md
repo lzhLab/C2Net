@@ -105,15 +105,7 @@ python train_seg.py --arch RNN_Model
 ```
 To explicitly train the proposed model:
 ```
-python train_seg.py --arch RNN_Model --lr 1e-3 --epochs 100 --batch-size 8
-```
-To print the model architecture and hyperparameters:
-```
-python train_seg.py --arch RNN_Model --print-model --epochs 1 --batch-size 2
-```
-To train U-Net:
-```
-python train_seg.py --arch Unet --lr 1e-3 --epochs 100
+python train_seg.py --arch RNN_Model --lr 1e-2 --epochs 100 --batch-size 8
 ```
 
 ## 5. Supported and Optional Baseline Models
