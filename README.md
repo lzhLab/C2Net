@@ -2,7 +2,7 @@
 
 Code for the manuscript:
 
-**“Bridging Unknown to Known: Connectivity-Guided Faithful Liver Vessel Segmentation”**  
+**“Learning Vascular continuity for Faithful Liver Vessel Segmentation”**  
 Yiqi Wang, Jin Zhang, Ziqi Wang, Zhicai Peng, Xunliang Xu, and Liang Zhao.
 
 C<sup>2</sup>Net is a connectivity-guided liver vessel segmentation framework. The current implementation provides a unified training entry point, `train_seg.py`, and supports calling the proposed C<sup>2</sup>Net model as well as additional baseline segmentation models through a common interface.
@@ -223,7 +223,7 @@ python train_seg.py --arch PSPNet
 If this code or model is useful for your research, please cite:
 
 Yiqi Wang, Jin Zhang, Ziqi Wang, Zhicai Peng, Xunliang Xu and Liang Zhao.
-Bridging Unknown to Known: Connectivity-Guided Faithful Liver Vessel Segmentation, 2026.
+Learning Vascular continuity for Faithful Liver Vessel Segmentation, 2026.
 
 ## References
 [1] Soler, L., Agnus, V., Fasquel, J., Moreau, J., Osswald, A., Bouhadjar, M., and Marescaux, J.
